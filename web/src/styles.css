@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #001e2b;
+  --color-ink-raised: #072f3e;
+  --color-ink-line: #16475a;
+  --color-leaf: #00ed64;
+  --color-leaf-deep: #00684a;
+  --color-mist: #9db8c2;
+  --color-danger: #ff7a7a;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+html {
+  color-scheme: dark;
+  background-color: var(--color-ink);
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-ink);
+  color: white;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Expanding "radar" rings behind the self badge (from the original design). */
+.radar {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+.radar::before,
+.radar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 1px solid var(--color-leaf);
+  opacity: 0;
+  animation: radar 2.4s ease-out infinite;
+}
+.radar::after {
+  animation-delay: 0.8s;
+}
+@keyframes radar {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(3);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .radar::before,
+  .radar::after {
+    animation: none;
+  }
+}
+
+dialog::backdrop {
+  background: rgb(0 0 0 / 0.6);
+}

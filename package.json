@@ -14,7 +14,7 @@
     "dev": "node scripts/dev.ts",
     "build": "npm run build -w @webdrop/web",
     "start": "node server/src/index.ts",
-    "typecheck": "tsc -p shared && tsc -p server && tsc -p web && tsc -p tsconfig.tools.json",
+    "typecheck": "tsc -p shared && tsc -p server && tsc -p web && tsc -p web/tsconfig.test.json && tsc -p tsconfig.tools.json",
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run",
     "test:e2e": "playwright test",
