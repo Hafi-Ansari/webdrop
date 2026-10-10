@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.vitest/
+test-results/
+playwright-report/
+blob-report/
+bench/results/*.json
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
