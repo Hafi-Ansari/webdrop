@@ -39,12 +39,12 @@ function TransferRow({ t, onCancel, onDismiss, onSave }: { t: TransferView } & O
   const final = FINAL.has(t.state);
   const Icon = t.direction === "out" ? ArrowUpFromLine : ArrowDownToLine;
   const pct = t.total > 0 ? t.bytes / t.total : t.state === "done" ? 1 : 0;
-  const tone = t.state === "failed" ? "text-danger" : t.state === "done" ? "text-leaf" : "text-mist";
+  const tone = t.state === "failed" ? "text-danger" : t.state === "done" ? "text-success" : "text-mist";
 
   return (
     <li className="rounded-xl border border-ink-line bg-ink-raised p-3" data-testid="transfer" data-state={t.state} data-direction={t.direction}>
       <div className="flex items-start gap-3">
-        <Icon className="mt-0.5 size-5 shrink-0 text-leaf" aria-hidden />
+        <Icon className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm">
             <span className="text-mist">{t.direction === "out" ? "To" : "From"} </span>
@@ -59,7 +59,7 @@ function TransferRow({ t, onCancel, onDismiss, onSave }: { t: TransferView } & O
               max={1}
               value={pct}
               aria-label="Progress"
-              className="mt-2 h-1.5 w-full appearance-none overflow-hidden rounded-full [&::-moz-progress-bar]:bg-leaf [&::-webkit-progress-bar]:bg-ink [&::-webkit-progress-value]:bg-leaf"
+              className="mt-2 h-1.5 w-full appearance-none overflow-hidden rounded-full [&::-moz-progress-bar]:bg-accent [&::-webkit-progress-bar]:bg-ink [&::-webkit-progress-value]:bg-accent"
             />
           )}
           <p className={`mt-1 text-xs ${tone}`} data-testid="transfer-status">
@@ -101,7 +101,7 @@ function TransferRow({ t, onCancel, onDismiss, onSave }: { t: TransferView } & O
           onClick={() => (final ? onDismiss(t.id) : onCancel(t.id))}
           aria-label={final ? "Dismiss" : "Cancel transfer"}
           data-testid={final ? "dismiss" : "cancel"}
-          className="rounded-md p-1 text-mist hover:bg-ink hover:text-white"
+          className="rounded-md p-1 text-mist hover:bg-ink hover:text-fg"
         >
           <X className="size-4" aria-hidden />
         </button>

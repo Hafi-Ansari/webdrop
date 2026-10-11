@@ -16,7 +16,7 @@ export function IncomingDialog({ prompt, more, onAccept, onDecline }: Props) {
       {prompt && (
         <div data-testid="incoming-dialog">
           <h2 className="text-lg font-semibold">
-            <span className="text-leaf">{prompt.peerName}</span> wants to send you {prompt.files.length === 1 ? "a file" : `${prompt.files.length} files`}
+            <span className="text-accent">{prompt.peerName}</span> wants to send you {prompt.files.length === 1 ? "a file" : `${prompt.files.length} files`}
           </h2>
           <ul className="mt-4 max-h-48 space-y-1.5 overflow-y-auto text-sm">
             {prompt.files.map((f, i) => (
@@ -32,7 +32,7 @@ export function IncomingDialog({ prompt, more, onAccept, onDecline }: Props) {
           {prompt.files.length > 1 && <p className="mt-2 text-sm text-mist">Total {formatBytes(prompt.total)}</p>}
 
           <div className="mt-5 flex items-center gap-3 rounded-xl bg-ink p-3">
-            <ShieldCheck className="size-6 shrink-0 text-leaf" aria-hidden />
+            <ShieldCheck className="size-6 shrink-0 text-accent" aria-hidden />
             <div>
               <p className="font-mono text-2xl tracking-widest" data-testid="incoming-sas">
                 {prompt.sas}
@@ -43,7 +43,7 @@ export function IncomingDialog({ prompt, more, onAccept, onDecline }: Props) {
 
           {more > 0 && <p className="mt-3 text-xs text-mist">{more} more request(s) waiting</p>}
           <div className="mt-6 flex justify-end gap-3">
-            <button type="button" onClick={() => onDecline(prompt.id)} className="rounded-lg px-4 py-2 font-medium text-mist hover:bg-ink hover:text-white">
+            <button type="button" onClick={() => onDecline(prompt.id)} className="rounded-lg px-4 py-2 font-medium text-mist hover:bg-ink hover:text-fg">
               Decline
             </button>
             <button
@@ -51,7 +51,7 @@ export function IncomingDialog({ prompt, more, onAccept, onDecline }: Props) {
               autoFocus
               data-testid="accept"
               onClick={() => onAccept(prompt.id)}
-              className="rounded-lg bg-leaf px-4 py-2 font-semibold text-ink hover:brightness-110"
+              className="rounded-lg bg-accent px-4 py-2 font-semibold text-ink hover:brightness-110"
             >
               Accept
             </button>

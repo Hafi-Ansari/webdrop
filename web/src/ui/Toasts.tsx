@@ -11,7 +11,7 @@ export function Toasts({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id:
           className={`pointer-events-auto flex max-w-sm items-start gap-2 rounded-lg border px-3 py-2 text-sm shadow-lg ${t.kind === "error" ? "border-danger/40 bg-ink-raised text-danger" : "border-ink-line bg-ink-raised"}`}
         >
           <span className="flex-1">{t.text}</span>
-          <button type="button" onClick={() => onDismiss(t.id)} aria-label="Dismiss" className="text-mist hover:text-white">
+          <button type="button" onClick={() => onDismiss(t.id)} aria-label="Dismiss" className="text-mist hover:text-fg">
             <X className="size-4" aria-hidden />
           </button>
         </div>

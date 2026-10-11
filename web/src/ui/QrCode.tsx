@@ -15,7 +15,7 @@ export function QrCode({ value, size = 168 }: { value: string; size?: number }) 
   }, [value]);
   return (
     <svg viewBox={`0 0 ${n} ${n}`} width={size} height={size} role="img" aria-label="QR code with the pairing link" shapeRendering="crispEdges" className="rounded-lg bg-white">
-      <path d={d} fill="#001e2b" />
+      <path d={d} fill="#282a36" />
     </svg>
   );
 }

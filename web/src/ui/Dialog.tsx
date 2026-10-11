@@ -17,7 +17,7 @@ export function Dialog({ open, onCancel, label, children }: { open: boolean; onC
         e.preventDefault();
         onCancel();
       }}
-      className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-2xl border border-ink-line bg-ink-raised p-6 text-white shadow-2xl"
+      className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-2xl border border-ink-line bg-ink-raised p-6 text-fg shadow-2xl"
     >
       {open && children}
     </dialog>

@@ -25,16 +25,16 @@ export function PairDialog({ open, code, onClose, onCreate, onJoin, onLeave }: P
       {code ? (
         <div className="mt-5 flex flex-col items-center gap-3 rounded-xl bg-ink p-4">
           <p className="text-sm text-mist">Enter this code on the other device, or scan it:</p>
-          <p className="font-mono text-4xl font-semibold tracking-[0.3em] text-leaf" data-testid="pair-code">
+          <p className="font-mono text-4xl font-semibold tracking-[0.3em] text-accent" data-testid="pair-code">
             {code}
           </p>
           <QrCode value={`${location.origin}/#pair=${code}`} />
-          <button type="button" onClick={onLeave} className="text-sm text-mist underline hover:text-white">
+          <button type="button" onClick={onLeave} className="text-sm text-mist underline hover:text-fg">
             Stop pairing
           </button>
         </div>
       ) : (
-        <button type="button" onClick={onCreate} className="mt-5 w-full rounded-lg bg-leaf px-4 py-2 font-semibold text-ink hover:brightness-110" data-testid="pair-create">
+        <button type="button" onClick={onCreate} className="mt-5 w-full rounded-lg bg-accent px-4 py-2 font-semibold text-ink hover:brightness-110" data-testid="pair-create">
           Show a pairing code
         </button>
       )}
@@ -61,16 +61,16 @@ export function PairDialog({ open, code, onClose, onCreate, onJoin, onLeave }: P
             autoCapitalize="characters"
             spellCheck={false}
             placeholder="ABC123"
-            className="min-w-0 flex-1 rounded-lg border border-ink-line bg-ink px-3 py-2 font-mono uppercase tracking-widest outline-none focus:border-leaf"
+            className="min-w-0 flex-1 rounded-lg border border-ink-line bg-ink px-3 py-2 font-mono uppercase tracking-widest outline-none focus:border-accent"
           />
-          <button type="submit" disabled={!valid} className="rounded-lg bg-ink-line px-4 py-2 font-medium enabled:hover:bg-leaf enabled:hover:text-ink disabled:opacity-50" data-testid="pair-join">
+          <button type="submit" disabled={!valid} className="rounded-lg bg-ink-line px-4 py-2 font-medium enabled:hover:bg-accent enabled:hover:text-ink disabled:opacity-50" data-testid="pair-join">
             Join
           </button>
         </div>
       </form>
 
       <div className="mt-6 flex justify-end">
-        <button type="button" onClick={onClose} className="rounded-lg px-4 py-2 font-medium text-mist hover:bg-ink hover:text-white">
+        <button type="button" onClick={onClose} className="rounded-lg px-4 py-2 font-medium text-mist hover:bg-ink hover:text-fg">
           Done
         </button>
       </div>

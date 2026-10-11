@@ -35,15 +35,15 @@ export function PeerCard({ peer, progress, onFiles }: Props) {
           setOver(false);
           onFiles([...e.dataTransfer.files]);
         }}
-        className="group flex w-36 flex-col items-center gap-1.5 rounded-2xl p-3 text-center outline-none transition hover:bg-ink-raised focus-visible:ring-2 focus-visible:ring-leaf"
+        className="group flex w-36 flex-col items-center gap-1.5 rounded-2xl p-3 text-center outline-none transition hover:bg-ink-raised focus-visible:ring-2 focus-visible:ring-accent"
       >
         <span
-          className={`relative mb-1 grid size-[4.5rem] place-items-center rounded-full bg-leaf text-ink transition-transform group-hover:scale-110 ${over ? "scale-110 ring-4 ring-leaf/40" : ""}`}
+          className={`relative mb-1 grid size-[4.5rem] place-items-center rounded-full bg-accent text-ink transition-transform group-hover:scale-110 ${over ? "scale-110 ring-4 ring-accent/40" : ""}`}
         >
           <Icon className="size-8" aria-hidden />
           {progress !== undefined && (
             <svg className="absolute -inset-1.5 size-[5.25rem] -rotate-90" viewBox="0 0 76 76" aria-hidden>
-              <circle cx="38" cy="38" r="34" fill="none" stroke="currentColor" strokeOpacity="0.15" strokeWidth="4" className="text-white" />
+              <circle cx="38" cy="38" r="34" fill="none" stroke="currentColor" strokeOpacity="0.15" strokeWidth="4" className="text-fg" />
               <circle
                 cx="38"
                 cy="38"
@@ -51,7 +51,7 @@ export function PeerCard({ peer, progress, onFiles }: Props) {
                 fill="none"
                 strokeWidth="4"
                 strokeLinecap="round"
-                className="stroke-white transition-[stroke-dashoffset]"
+                className="stroke-fg transition-[stroke-dashoffset]"
                 strokeDasharray={RING}
                 strokeDashoffset={RING * (1 - progress)}
               />
@@ -62,7 +62,7 @@ export function PeerCard({ peer, progress, onFiles }: Props) {
           {peer.name}
         </span>
         <span className="text-xs text-mist">{describeDevice(peer.device)}</span>
-        {paired && <span className="text-[10px] font-semibold uppercase tracking-wider text-leaf">Paired</span>}
+        {paired && <span className="text-[10px] font-semibold uppercase tracking-wider text-accent">Paired</span>}
       </button>
       <input
         ref={input}

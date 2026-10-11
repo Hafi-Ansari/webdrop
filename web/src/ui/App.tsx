@@ -8,7 +8,7 @@ import { Toasts } from "./Toasts.tsx";
 import { TransferList } from "./TransferList.tsx";
 
 const CONNECTION = {
-  open: { dot: "bg-leaf", label: "Online" },
+  open: { dot: "bg-success", label: "Online" },
   connecting: { dot: "bg-amber-400 animate-pulse", label: "Connecting…" },
   offline: { dot: "bg-danger", label: "Offline — reconnecting" },
 } as const;
@@ -29,7 +29,7 @@ export function App({ controller }: { controller: Controller }) {
     <div className="flex min-h-dvh flex-col">
       <header className="flex items-center justify-between gap-3 px-4 py-3 sm:px-6">
         <div className="flex items-center gap-2 text-lg font-semibold">
-          <Radar className="size-6 text-leaf" aria-hidden />
+          <Radar className="size-6 text-accent" aria-hidden />
           WebDrop
         </div>
         <div className="flex items-center gap-3">
@@ -41,7 +41,7 @@ export function App({ controller }: { controller: Controller }) {
             type="button"
             onClick={() => setPairOpen(true)}
             data-testid="pair-open"
-            className="flex items-center gap-1.5 rounded-lg border border-ink-line px-3 py-1.5 text-sm hover:border-leaf hover:text-leaf"
+            className="flex items-center gap-1.5 rounded-lg border border-ink-line px-3 py-1.5 text-sm hover:border-accent hover:text-accent"
           >
             <Link2 className="size-4" aria-hidden />
             Pair device
@@ -52,10 +52,10 @@ export function App({ controller }: { controller: Controller }) {
       <main className="flex flex-1 flex-col items-center justify-center px-4 py-8">
         {state.peers.length === 0 ? (
           <div className="max-w-md text-center">
-            <h1 className="text-2xl font-semibold text-leaf">Open WebDrop on other devices to send files</h1>
+            <h1 className="text-2xl font-semibold text-accent">Open WebDrop on other devices to send files</h1>
             <p className="mt-2 text-mist">
               Devices on the same network show up here automatically. On a different network?{" "}
-              <button type="button" onClick={() => setPairOpen(true)} className="text-white underline hover:text-leaf">
+              <button type="button" onClick={() => setPairOpen(true)} className="text-fg underline hover:text-accent">
                 Pair with a code
               </button>
               .
@@ -83,11 +83,11 @@ export function App({ controller }: { controller: Controller }) {
 
       <footer className="flex flex-col items-center gap-1 px-4 pb-6 pt-6 text-center">
         <div className="radar mb-4 size-14 rounded-full">
-          <Wifi className="size-10 text-leaf" aria-hidden />
+          <Wifi className="size-10 text-accent" aria-hidden />
         </div>
         <p>
           You are known as{" "}
-          <strong className="text-leaf" data-testid="self-name">
+          <strong className="text-accent" data-testid="self-name">
             {state.self?.name ?? "…"}
           </strong>
         </p>
@@ -96,7 +96,7 @@ export function App({ controller }: { controller: Controller }) {
           {state.pairCode && (
             <>
               {" "}
-              and in pairing room <span className="font-mono text-white">{state.pairCode}</span>
+              and in pairing room <span className="font-mono text-fg">{state.pairCode}</span>
             </>
           )}
           .
