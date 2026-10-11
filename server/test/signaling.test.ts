@@ -359,8 +359,9 @@ describe("resume", () => {
     const { welcome: wb } = await b.hello();
     await a.next("peer-joined");
 
-    b.ws.close(CloseCode.leaving);
+    b.send({ t: "bye" });
     expect((await a.next("peer-left", () => true, 500)).id).toBe(wb.self.id);
+    expect((await b.closed).code).toBe(CloseCode.normal);
 
     const b2 = await TestClient.connect(s);
     const { welcome: wb2, peers } = await b2.hello(wb.resume);
@@ -368,6 +369,20 @@ describe("resume", () => {
     expect(wb2.self).toEqual(wb.self);
     expect(peers.peers).toHaveLength(1);
     expect((await a.next("peer-joined")).peer).toEqual(wb.self);
+  });
+
+  it("lets a reload resume after bye even while a proxy holds the old socket open", async () => {
+    s = await startServer({ limits: { resumeGraceMs: 5000 } });
+    const b = await TestClient.connect(s);
+    const { welcome: wb } = await b.hello();
+    b.send({ t: "bye" });
+    // Never read the server's close frame, so the old socket stays open.
+    b.ws.pause();
+    await sleep(50);
+    const b2 = await TestClient.connect(s);
+    const { welcome: wb2 } = await b2.hello(wb.resume);
+    expect(wb2.resumed).toBe(true);
+    expect(wb2.self).toEqual(wb.self);
   });
 
   it("rejoins a vacated pair room on resume", async () => {
@@ -382,7 +397,7 @@ describe("resume", () => {
     await b.next("peers", (m) => m.room === room);
     await a.next("peer-joined");
 
-    a.ws.close(CloseCode.leaving);
+    a.send({ t: "bye" });
     expect(await b.next("peer-left")).toEqual({ t: "peer-left", room, id: wa.self.id });
 
     const a2 = await TestClient.connect(s, { ip: "203.0.113.5" });
@@ -398,7 +413,7 @@ describe("resume", () => {
     a.send({ t: "room-create" });
     const { room } = await a.next("peers", (m) => m.room.startsWith("pair:"));
 
-    a.ws.close(CloseCode.leaving);
+    a.send({ t: "bye" });
     await a.closed;
     await sleep(50);
     const a2 = await TestClient.connect(s, { ip: "203.0.113.5" });

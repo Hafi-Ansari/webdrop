@@ -112,7 +112,7 @@ export function createAppServer(config: Config, deps: { log?: Logger; iceProvide
       const text = Array.isArray(data) ? Buffer.concat(data).toString("utf8") : Buffer.from(data as ArrayBuffer).toString("utf8");
       conn.onMessage(text).catch((err: unknown) => log.error("message handler failed", { error: String(err) }));
     });
-    ws.on("close", (code) => conn.onClose(code));
+    ws.on("close", () => conn.onClose());
     ws.on("error", () => ws.terminate());
   }
 

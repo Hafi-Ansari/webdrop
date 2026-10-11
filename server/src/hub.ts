@@ -168,9 +168,9 @@ export class Hub {
   }
 
   /**
-   * @internal Socket closed: keep the identity for the grace period so the
-   * client can resume. A client leaving its page also leaves its rooms now
-   * instead of lingering in other devices' lists until the grace period ends.
+   * @internal Socket closed, or the client said `bye`: keep the identity for the
+   * grace period so the client can resume. A client leaving its page also leaves
+   * its rooms now instead of lingering in other devices' lists until then.
    */
   detachPeer(peer: PeerState, transport: Transport, leaving: boolean): void {
     if (peer.transport !== transport) return;
@@ -369,16 +369,21 @@ export class Connection {
         return this.hub.leavePairRoom(peer);
       case "ping":
         return this.hub.send(peer, { t: "pong" });
+      case "bye":
+        // Detach now rather than when the socket closes, which a proxy may delay;
+        // a reload's new socket can then resume the identity straight away.
+        this.hub.detachPeer(peer, this.transport, true);
+        this.peer = null;
+        return this.terminate(CloseCode.normal, "bye");
     }
   }
 
-  /** `code` is the close code the client sent, if any. */
-  onClose(code?: number): void {
+  onClose(): void {
     if (this.closed) return;
     this.closed = true;
     clearTimeout(this.helloTimer);
     this.hub.released(this.ip);
-    if (this.peer) this.hub.detachPeer(this.peer, this.transport, code === CloseCode.leaving);
+    if (this.peer) this.hub.detachPeer(this.peer, this.transport, false);
   }
 
   private async hello(msg: Extract<ClientMessage, { t: "hello" }>): Promise<void> {
@@ -393,7 +398,8 @@ export class Connection {
     } catch (err) {
       this.hub.opts.log.warn("ice provider failed", { error: String(err) });
     }
-    if (this.closed) return;
+    // Closed, or said `bye`, while we waited.
+    if (this.closed || this.peer !== peer) return;
     this.hub.send(peer, {
       t: "welcome",
       self: { id: peer.id, name: peer.name, device: peer.device },

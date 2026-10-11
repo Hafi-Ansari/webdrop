@@ -98,6 +98,12 @@ export const ClientMessage = z.discriminatedUnion("t", [
   z.strictObject({ t: z.literal("room-join"), code: RoomCode }),
   z.strictObject({ t: z.literal("room-leave") }),
   z.strictObject({ t: z.literal("ping") }),
+  /**
+   * The page is going away (close, reload, navigation). A message rather than a
+   * close code: proxies may answer the close handshake themselves and hold the
+   * server's side of the socket open for seconds.
+   */
+  z.strictObject({ t: z.literal("bye") }),
 ]);
 export type ClientMessage = z.infer<typeof ClientMessage>;
 
@@ -144,8 +150,6 @@ export const CloseCode = {
   rateLimited: 4002,
   replaced: 4003,
   slowConsumer: 4004,
-  /** Sent by the client when its page goes away (close, reload, navigation). */
-  leaving: 4005,
 } as const;
 
 export function parseJson(raw: string): unknown {

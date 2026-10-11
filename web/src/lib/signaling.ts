@@ -1,4 +1,4 @@
-import { CloseCode, PROTOCOL_VERSION, ServerMessage, parseJson, type ClientMessage, type DeviceInfo } from "@webdrop/shared/protocol";
+import { PROTOCOL_VERSION, ServerMessage, parseJson, type ClientMessage, type DeviceInfo } from "@webdrop/shared/protocol";
 
 export type SignalingState = "connecting" | "open" | "offline";
 
@@ -15,8 +15,8 @@ function storage(): Storage | null {
 /**
  * Reconnecting signaling socket. Keeps the server-issued resume token in
  * sessionStorage (per tab) so a reload or network blip keeps our identity.
- * Leaving the page closes the socket with `CloseCode.leaving`, so other
- * devices drop us at once instead of after the server's resume grace period.
+ * Leaving the page sends `bye`, so other devices drop us at once instead of
+ * after the server's resume grace period.
  */
 export class SignalingClient {
   state: SignalingState = "connecting";
@@ -68,7 +68,8 @@ export class SignalingClient {
   stop(): void {
     this.stopped = true;
     clearTimeout(this.reconnectTimer);
-    this.ws?.close(CloseCode.leaving, "leaving");
+    this.send({ t: "bye" });
+    this.ws?.close(1000);
   }
 
   private setState(state: SignalingState): void {
