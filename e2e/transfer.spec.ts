@@ -65,12 +65,17 @@ test("sends several files in one go", async ({ browser }, info) => {
     const digests = [await makeFile(paths[0]!, 300_000), await makeFile(paths[1]!, 2_000_000), await makeFile(paths[2]!, 0)];
     await sendTo(alice.page, bob.name, paths);
     await expect(bob.page.getByTestId("incoming-file")).toHaveCount(3);
-    const downloads: Promise<string>[] = [];
-    bob.page.on("download", (d) => downloads.push(d.path().then((p) => sha256(p!))));
+    // Files are saved in order, but the browser can report their downloads out of order: match by name.
+    const downloads: Promise<[string, string]>[] = [];
+    bob.page.on("download", (d) => downloads.push(d.path().then(async (p) => [d.suggestedFilename(), await sha256(p!)])));
     await bob.page.getByTestId("accept").click();
     await expect(bob.page.getByTestId("transfer")).toHaveAttribute("data-state", "done");
     await expect.poll(() => downloads.length).toBe(3);
-    expect(await Promise.all(downloads)).toEqual(digests);
+    expect(Object.fromEntries(await Promise.all(downloads))).toEqual({
+      "one.bin": digests[0],
+      "two.bin": digests[1],
+      "empty.bin": digests[2],
+    });
   } finally {
     await alice.close();
     await bob.close();
