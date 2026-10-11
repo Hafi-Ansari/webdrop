@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { normalizeCode } from "../lib/controller.ts";
+import { normalizeCode } from "../lib/pairing.ts";
 import { Dialog } from "./Dialog.tsx";
 import { QrCode } from "./QrCode.tsx";
 

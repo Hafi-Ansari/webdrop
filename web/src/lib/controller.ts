@@ -2,6 +2,7 @@ import type { DeviceInfo, ErrorCode, Peer, RoomTag, ServerMessage, SignalPayload
 import { TokenBucket } from "@webdrop/shared/rate-limit";
 import { randomId } from "./bytes.ts";
 import { saveFile } from "./download.ts";
+import { normalizeCode } from "./pairing.ts";
 import type { FileMeta } from "./peer-protocol.ts";
 import type { SecureLink } from "./secure-link.ts";
 import { PeerSession } from "./session.ts";
@@ -100,6 +101,8 @@ export class Controller {
   private toastSeq = 0;
   private refreshTimer: ReturnType<typeof setTimeout> | undefined;
   private pendingJoin: string | null = null;
+  private staleRooms = new Set<RoomTag>();
+  private staleTimer: ReturnType<typeof setTimeout> | undefined;
   /** Remote-initiated session budget per peer: stops a peer from making us build connections in a loop. */
   private readonly sessionBudget = new Map<string, TokenBucket>();
 
@@ -201,9 +204,18 @@ export class Controller {
         }
         this.self = msg.self;
         this.iceServers = msg.iceServers.map((s) => ({ ...s, urls: s.urls }));
-        const before = this.allPeerIds();
-        this.rooms.clear();
-        this.departed(before);
+        // Fresh room snapshots follow immediately. Keep the old view until
+        // they arrive so a signaling blip does not tear down live transfers;
+        // rooms the server does not re-send are dropped shortly after.
+        this.staleRooms = new Set(this.rooms.keys());
+        clearTimeout(this.staleTimer);
+        this.staleTimer = setTimeout(() => {
+          const before = this.allPeerIds();
+          for (const tag of this.staleRooms) this.rooms.delete(tag);
+          this.staleRooms.clear();
+          this.departed(before);
+          this.refresh(true);
+        }, 3000);
         if (this.pendingJoin) {
           this.signaling.send({ t: "room-join", code: this.pendingJoin });
           this.pendingJoin = null;
@@ -212,6 +224,7 @@ export class Controller {
       }
       case "peers": {
         const before = this.allPeerIds();
+        this.staleRooms.delete(msg.room);
         this.rooms.set(msg.room, new Map(msg.peers.map((p) => [p.id, p])));
         this.departed(before);
         for (const p of msg.peers) this.transfers.rename(p.id, p.name);
@@ -359,8 +372,11 @@ export class Controller {
     const current = this.sessions.get(from);
     switch (payload.kind) {
       case "connect":
-        // Only the lower id offers. The requester has no usable session, so start fresh.
-        if (this.isOfferer(from) && this.allowRemoteSession(from)) this.createSession(from, randomId(), true);
+        // Only the lower id offers. A session still being set up will reach
+        // the requester anyway; otherwise the requester lost it, so start fresh.
+        if (!this.isOfferer(from)) return;
+        if (current && !current.isClosed && !current.link.keys) return;
+        if (this.allowRemoteSession(from)) this.createSession(from, randomId(), true);
         return;
       case "description":
         if (payload.description.type === "offer") {
@@ -460,9 +476,4 @@ export class Controller {
       toasts: this.toasts,
     };
   }
-}
-
-/** Crockford base32: accept lowercase and the usual look-alikes. */
-export function normalizeCode(raw: string): string {
-  return raw.toUpperCase().replace(/O/g, "0").replace(/[IL]/g, "1").replace(/[^0-9A-Z]/g, "");
 }

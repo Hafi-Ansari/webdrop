@@ -49,3 +49,31 @@ test("a transfer resumes where it left off after the connection drops", async ({
     await bob.close();
   }
 });
+
+test("a signaling reconnect does not disturb a running transfer", async ({ browser }, info) => {
+  const alice = await openDevice(browser);
+  const bob = await openDevice(browser);
+  try {
+    const path = info.outputPath("steady.bin");
+    const digest = await makeFile(path, 48 * 1024 * 1024);
+    await sendTo(alice.page, bob.name, path);
+    const download = bob.page.waitForEvent("download", { timeout: 60_000 });
+    await bob.page.getByTestId("accept").click();
+
+    await bob.page.waitForFunction(() => {
+      const t = [...(window as any).__webdrop.controller.transfers.incoming.values()][0];
+      return t && t.bytes > 4 * 1024 * 1024;
+    });
+    // Drop both WebSockets; the P2P link is independent and identities resume.
+    for (const d of [alice, bob]) await d.page.evaluate(() => (window as any).__webdrop.controller.signaling.ws.close());
+    await expect(alice.page.getByTestId("connection")).toHaveAttribute("data-state", "open");
+
+    expect(await sha256((await (await download).path())!)).toBe(digest);
+    await expect(alice.page.getByTestId("transfer")).toHaveAttribute("data-state", "done");
+    // Same names after the reconnect: identities were resumed, not replaced.
+    await expect(alice.page.getByTestId("self-name")).toHaveText(alice.name);
+  } finally {
+    await alice.close();
+    await bob.close();
+  }
+});
