@@ -64,12 +64,9 @@ Render's free web services support WebSockets and, since February 2026, stay awa
 included [`render.yaml`](render.yaml) blueprint deploys the Docker image as a single free web service, which serves
 both the app and signaling on one HTTPS origin.
 
-1. Push this folder to its own GitHub repository (`new-version` must be the repository root):
-   ```bash
-   cd new-version
-   gh repo create webdrop --private --source . --push   # or create the repo on github.com and git push
-   ```
-2. On <https://dashboard.render.com>, go to **New → Blueprint**, pick the repository, and click **Apply**.
+1. Sign in at <https://dashboard.render.com> with GitHub and give Render access to this repository.
+2. Open <https://render.com/deploy?repo=https://github.com/Hafi-Ansari/webdrop> (or go to **New → Blueprint** and
+   pick the repository), leave the TURN variables empty, and click **Apply**. For a fork, use your own repo URL.
 3. Wait for the build (about 2–3 minutes), then open `https://webdrop-xxxx.onrender.com`.
 4. **Check discovery is per-network.** In the service's **Logs**, find the `client ip source` line. It should say
    `"source":"header"`. If it says `"socket"`, Render didn't send `cf-connecting-ip`. Then set

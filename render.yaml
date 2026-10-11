@@ -9,7 +9,8 @@ services:
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /healthz
-    autoDeployTrigger: commit
+    # Deploy a push only after GitHub CI passes on it.
+    autoDeployTrigger: checksPass
     envVars:
       # Render's edge (Cloudflare) sets this to the real client IP; used to group
       # devices by network. Check the "client ip source" log line after deploy.
