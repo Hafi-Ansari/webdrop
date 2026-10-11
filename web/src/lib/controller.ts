@@ -29,6 +29,8 @@ export interface TransferView {
   error: string | undefined;
   /** Incoming only: indices of files saved so far. */
   saved: number[];
+  /** Incoming only: indices of files that can still be saved (not evicted). */
+  savable: number[];
 }
 
 export interface Toast {
@@ -163,12 +165,13 @@ export class Controller {
 
   dismiss(id: string): void {
     this.transfers.remove(id);
+    this.savedFiles.delete(id);
   }
 
   save(id: string, index: number): void {
     const t = this.transfers.incoming.get(id);
     const file = t?.results[index];
-    if (t && file) {
+    if (t && file && t.canSave(index)) {
       saveFile(file);
       this.markSaved(t, index);
     }
@@ -464,6 +467,7 @@ export class Controller {
       sas: t.sas,
       error: t.error,
       saved: [...(this.savedFiles.get(t.id) ?? [])],
+      savable: t.direction === "in" ? t.files.map((_, i) => i).filter((i) => t.canSave(i)) : [],
     });
     const all = [...this.transfers.outgoing.values(), ...this.transfers.incoming.values()].sort((a, b) => b.createdAt - a.createdAt);
     return {

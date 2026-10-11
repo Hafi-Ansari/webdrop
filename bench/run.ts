@@ -10,7 +10,10 @@
  */
 import { spawn, execFileSync, type ChildProcess } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { chromium, firefox, webkit, type Browser, type Page } from "@playwright/test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { chromium, firefox, webkit, type BrowserContext, type Page } from "@playwright/test";
 
 const args = new Map<string, string>();
 for (let i = 2; i < process.argv.length; i += 2) args.set(process.argv[i]!.replace(/^--/, ""), process.argv[i + 1] ?? "");
@@ -25,10 +28,16 @@ const browserPairs = (args.get("browsers") ?? "chromium:chromium").split(",").ma
 const PORT = Number(args.get("port") ?? 4180);
 const base = `http://localhost:${PORT}`;
 
-const launchers: Record<string, () => Promise<Browser>> = {
-  chromium: () => chromium.launch({ args: ["--disable-features=WebRtcHideLocalIpsWithMdns"] }),
-  firefox: () => firefox.launch({ firefoxUserPrefs: { "media.peerconnection.ice.obfuscate_host_addresses": false } }),
-  webkit: () => webkit.launch(),
+/**
+ * Each "device" is a persistent profile in its own browser process, like a
+ * real device: disk-backed storage and its own WebRTC network thread.
+ * (Private contexts have a small, memory-backed storage quota.)
+ */
+const launchers: Record<string, (dir: string) => Promise<BrowserContext>> = {
+  chromium: (dir) => chromium.launchPersistentContext(dir, { args: ["--disable-features=WebRtcHideLocalIpsWithMdns"], acceptDownloads: false }),
+  firefox: (dir) =>
+    firefox.launchPersistentContext(dir, { firefoxUserPrefs: { "media.peerconnection.ice.obfuscate_host_addresses": false }, acceptDownloads: false }),
+  webkit: (dir) => webkit.launchPersistentContext(dir, { acceptDownloads: false }),
 };
 
 async function startServer(): Promise<ChildProcess> {
@@ -48,13 +57,21 @@ async function startServer(): Promise<ChildProcess> {
   throw new Error("server did not start");
 }
 
-async function open(browser: Browser): Promise<{ page: Page; id: string }> {
-  const ctx = await browser.newContext({ acceptDownloads: false });
-  const page = await ctx.newPage();
+async function open(engine: string): Promise<{ page: Page; id: string; close(): Promise<void> }> {
+  const dir = mkdtempSync(path.join(tmpdir(), "webdrop-bench-"));
+  const ctx = await launchers[engine]!(dir);
+  const page = ctx.pages()[0] ?? (await ctx.newPage());
   await page.goto(base);
   await page.waitForFunction(() => (window as any).__webdrop?.controller.store.get().self);
   const id = await page.evaluate(() => (window as any).__webdrop.controller.store.get().self.id as string);
-  return { page, id };
+  return {
+    page,
+    id,
+    close: async () => {
+      await ctx.close();
+      rmSync(dir, { recursive: true, force: true });
+    },
+  };
 }
 
 async function once(sender: Page, receiver: Page, receiverId: string, chunkKb: number): Promise<{ mbps: number; chunk: number }> {
@@ -97,7 +114,13 @@ async function once(sender: Page, receiver: Page, receiverId: string, chunkKb: n
     { id: receiverId, bytes: sizeMb * 1024 * 1024 },
   );
   await accepted;
-  const r = await result;
+  const r = await result.catch(async (err: unknown) => {
+    const why = await receiver.evaluate(() => {
+      const ts = [...(window as any).__webdrop.controller.transfers.incoming.values()];
+      return ts.map((t: any) => `${t.state}: ${t.error}`).join("; ");
+    });
+    throw new Error(`${String(err)} | receiver: ${why}`);
+  });
   return { mbps: (sizeMb * 1.048576) / r.seconds, chunk: r.chunk };
 }
 
@@ -105,22 +128,18 @@ const server = await startServer();
 const rows: Array<{ pair: string; chunkKb: number; mbps: number[] }> = [];
 try {
   for (const [from, to] of browserPairs) {
-    const a = await launchers[from!]!();
-    const b = await launchers[to!]!();
-    try {
-      for (const chunkKb of chunksKb) {
-        const sender = await open(a);
-        const receiver = await open(b);
+    for (const chunkKb of chunksKb) {
+      const sender = await open(from!);
+      const receiver = await open(to!);
+      try {
         const mbps: number[] = [];
         for (let i = 0; i < runs; i++) mbps.push((await once(sender.page, receiver.page, receiver.id, chunkKb)).mbps);
         rows.push({ pair: `${from}→${to}`, chunkKb, mbps });
         console.log(`${from}→${to} chunk ${chunkKb} KiB (${sink}): ${mbps.map((m) => m.toFixed(1)).join(", ")} MB/s`);
-        await sender.page.context().close();
-        await receiver.page.context().close();
+      } finally {
+        await sender.close();
+        await receiver.close();
       }
-    } finally {
-      await a.close();
-      await b.close();
     }
   }
 } finally {
@@ -130,7 +149,7 @@ try {
 const lines = [
   `# Benchmark ${new Date().toISOString()}`,
   "",
-  `${sizeMb} MiB synthetic file, ${runs} run(s) each, receiver sink: ${sink}, send buffer ${highMb}/${lowMb} MiB, loopback on ${process.platform}/${process.arch}.`,
+  `${sizeMb} MiB synthetic file, ${runs} run(s) each, receiver sink: ${sink}, send buffer ${highMb}/${lowMb} MiB, persistent profiles, loopback on ${process.platform}/${process.arch}.`,
   "",
   "| browsers | chunk | MB/s (best) | runs |",
   "|---|---|---|---|",

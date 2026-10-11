@@ -4,7 +4,7 @@ import { FLAG_LAST, HEADER_BYTES, openFrame, sealFrame, TAG_BYTES, type FrameHea
 import type { FileMeta, SealedMessage } from "./peer-protocol.ts";
 import { sanitizeFileName, sanitizeMime } from "./sanitize.ts";
 import { LinkClosedError, type SecureLink } from "./secure-link.ts";
-import type { Sink } from "./sinks.ts";
+import { OpfsSink, StorageError, type Sink } from "./sinks.ts";
 import { chunkSizeFor, tuning } from "./tuning.ts";
 
 export type TransferState =
@@ -122,6 +122,7 @@ abstract class TransferBase {
 
 export class Outgoing extends TransferBase {
   readonly direction = "out";
+  /** Emptied once the transfer is final so large selections can be garbage-collected. */
   private readonly sources: File[];
   /** prefix[i] = total size of files before i. */
   private readonly prefix: number[];
@@ -252,6 +253,11 @@ export class Outgoing extends TransferBase {
     }
   }
 
+  protected override finish(state: Extract<TransferState, "done" | "declined" | "cancelled" | "failed">, error?: string): void {
+    super.finish(state, error);
+    this.sources.length = 0;
+  }
+
   /** Route a sealed message for this transfer. */
   handle(msg: SealedMessage): void {
     switch (msg.t) {
@@ -316,7 +322,7 @@ export class Outgoing extends TransferBase {
 // Receiving
 // =============================================================================
 
-export type SinkFactory = (name: string, transferTotal: number) => Promise<Sink>;
+export type SinkFactory = (name: string, fileSize: number, transferTotal: number) => Promise<Sink>;
 
 export class Incoming extends TransferBase {
   readonly direction = "in";
@@ -327,6 +333,8 @@ export class Incoming extends TransferBase {
   private readonly offered: FileMeta[];
   private readonly createSink: SinkFactory;
   private readonly sinks: Array<Sink | undefined> = [];
+  /** Sinks of completed files by index, kept so their storage can be released on dismiss. */
+  private readonly finished: Array<Sink | undefined> = [];
   private key: CryptoKey | undefined;
   private stream = 0;
   private chain: Promise<void> = Promise.resolve();
@@ -447,7 +455,8 @@ export class Incoming extends TransferBase {
       .catch((err: unknown) => {
         if (this.isFinal) return;
         this.link?.send({ t: "cancel", id: this.id, reason: "error" }).catch(() => {});
-        this.stop("failed", err instanceof Error ? err.message : String(err));
+        const quota = err instanceof StorageError || (err instanceof Error && err.name === "QuotaExceededError");
+        this.stop("failed", quota ? "not enough storage space on this device" : err instanceof Error ? err.message : String(err));
       });
   }
 
@@ -463,7 +472,7 @@ export class Incoming extends TransferBase {
     if (!meta) throw new Error("no such file");
     let sink = this.sinks[index];
     if (!sink) {
-      sink = await this.createSink(meta.name, this.total);
+      sink = await this.createSink(meta.name, meta.size, this.total);
       this.sinks[index] = sink;
     }
     await sink.write(data);
@@ -473,6 +482,14 @@ export class Incoming extends TransferBase {
     if (last) {
       const file = await sink.finish();
       this.sinks[index] = undefined;
+      this.finished[index] = sink;
+      if (sink instanceof OpfsSink) {
+        // If the storage is later evicted for space, let go of the snapshot too.
+        sink.onRelease = () => {
+          this.results[index] = undefined;
+          this.onChange();
+        };
+      }
       this.results[index] = file;
       this.fileIndex = index + 1;
       this.written = 0;
@@ -500,6 +517,18 @@ export class Incoming extends TransferBase {
     this.finish(state, error);
     for (const sink of this.sinks) void sink?.abort();
     this.sinks.length = 0;
+  }
+
+  /** Drop received files and free their storage (OPFS). Only for final transfers. */
+  async release(): Promise<void> {
+    if (!this.isFinal) return;
+    this.results.length = 0;
+    await Promise.all(this.finished.splice(0).map((s) => s?.release()));
+  }
+
+  /** Whether file `index` can still be saved (it may have been evicted to make room). */
+  canSave(index: number): boolean {
+    return this.results[index] !== undefined && this.finished[index]?.available !== false;
   }
 
   /** True if this transfer owns frames tagged `stream` on `link`. */

@@ -25,11 +25,15 @@ new-version/
               http: static files + security headers + /healthz
               ws:   /ws signaling — rooms, relay, rate limiting, resume
   web/        React 19 + Vite 8 + Tailwind 4
-              lib/signaling   reconnecting WS client
-              lib/peer        RTCPeerConnection, perfect negotiation, negotiated channels
-              lib/secure      handshake, key schedule, sealing (WebCrypto)
-              lib/transfer    sender / receiver / framing / sinks (OPFS, memory)
-              ui/             components
+              lib/signaling.ts         reconnecting WS client
+              lib/session.ts           RTCPeerConnection (lower id offers), negotiated channels, ICE restart
+              lib/secure-link.ts       handshake + sealed control messages over the channels
+              lib/crypto.ts            key schedule, SAS, sealing (WebCrypto)
+              lib/framing.ts           encrypted data frames
+              lib/transfer*.ts         sender / receiver / routing, resume, flow control
+              lib/sinks.ts             OPFS and memory sinks
+              lib/controller.ts        glue + UI store
+              ui/                      components
   e2e/        Playwright two-browser tests
   bench/      throughput benchmark (real browsers over WebRTC) + crypto microbench
 ```

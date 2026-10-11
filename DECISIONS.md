@@ -34,7 +34,8 @@ Each decision has a one-line rationale. Versions were checked against the npm re
 - **Single-instance in-memory hub behind a small interface.** Render's free tier is one instance. Horizontal scale needs room-affinity routing or a pub/sub broker (documented as future work).
 
 ## WebRTC & transfer
-- **Perfect-negotiation pattern with two negotiated channels (`ctrl` id 0, `data` id 1).** It handles glare deterministically, and control messages never queue behind megabytes of file data.
+- **Only the lower peer ID ever creates offers (it is also handshake role A); the other side asks with a `connect` signal.** This removes glare entirely, which is simpler and more predictable than perfect negotiation.
+- **Two pre-negotiated data channels (`ctrl` id 0, `data` id 1).** Control messages never queue behind megabytes of file data, and there's no in-band channel announcement to race.
 - **STUN: Google + Cloudflare public servers; TURN optional via coturn shared secret or Cloudflare Realtime TURN API.** No secrets are in code, credentials are short-lived and minted server-side, and Cloudflare's free tier gives 1,000 GB/month.
 - **App-layer E2E on top of DTLS: ECDH P-256 + HKDF-SHA-256 + AES-256-GCM.** Every browser supports these in WebCrypto, and they protect file contents even if the signaling server is malicious and the users compare codes.
 - **Hash-commitment handshake + 6-digit SAS (like Bluetooth numeric comparison).** Without the commitment, a MITM could grind keys until the short code matched.
@@ -48,7 +49,11 @@ Each decision has a one-line rationale. Versions were checked against the npm re
 
 ## Deploy
 - **Render free web service (Docker runtime) via `render.yaml` blueprint.** It's free with no credit card and supports WebSockets; since Feb 2026, WebSocket messages keep the instance awake.
-- **Dockerfile (node:24-alpine, non-root, multi-stage).** It runs unchanged on Fly.io, Koyeb, DigitalOcean (GitHub Student Pack credits), Azure Container Apps, or a VM.
+- **Dockerfile pinned to `node:24.21.0-alpine3.24`: multi-stage, server-only prod deps, root-owned code, runs as `node`, npm removed.** It runs unchanged on Fly.io, Koyeb, DigitalOcean (GitHub Student Pack credits), Azure Container Apps, or a VM, and works with `--read-only --cap-drop ALL`.
+- **Image verified locally with Colima + Docker CLI (Homebrew).** Docker Desktop isn't needed; the e2e suite was run against the container.
+- **GitHub Actions CI (checkout v7, setup-node v7, buildx v4, build-push v7): checks, e2e on three engines, image smoke test.** Firefox can't launch locally on macOS 27, so CI on Ubuntu covers it.
+- **Phone testing via a Cloudflare quick tunnel (`cloudflared tunnel --url`).** WebCrypto requires HTTPS; quick tunnels are free, need no account, and support WebSockets.
+- **Server logs which client-IP source it used (never the IP).** Render's proxy headers aren't documented, so the operator can confirm the setting after deploying.
 - **Vercel is not used.** Vercel functions can't host a long-lived WebSocket server; the same-origin single service is simpler.
 
 ## Hardening (milestone 4)
@@ -58,6 +63,8 @@ Each decision has a one-line rationale. Versions were checked against the npm re
 - **The token bucket lives in `shared/`.** Server and client use one implementation.
 - **Pairing links use the URL fragment (`#pair=CODE`) and also react to `hashchange`.** Fragments never reach servers or logs, and scanning a QR code with the app already open still works.
 - **SECURITY.md documents the threat model, including the "codes are optional" caveat.** Honest scope beats an overclaimed "unbreakable E2E".
+- **A signaling reconnect keeps the current peer view until fresh room snapshots arrive (3 s grace).** Clearing it on `welcome` failed every live transfer on any WebSocket blip; an e2e test covers this.
+- **A `connect` request never replaces a session that is still being set up.** The pending offer reaches the requester anyway; replacing it caused pointless churn.
 
 ## Performance (benchmarks in bench/)
 - **Default chunk 128 KiB (capped by SCTP max-message-size).** It was marginally fastest in the 64/128/256 KiB sweep (all within noise at ~25–29 MB/s), with fewer messages and crypto calls than 64 KiB, and it fits Chrome/Safari's 256 KiB limit.

@@ -10,7 +10,7 @@ import { linkPair, until } from "./fakes.ts";
 
 /** A receiver ("bob") whose disk never finishes a write, facing a hand-driven sender. */
 async function setup(opts: { autoAccept?: boolean; maxPendingPerPeer?: number } = {}) {
-  const stuck: Sink = { write: () => new Promise(() => {}), finish: async () => new File([], "x"), abort: async () => {} };
+  const stuck: Sink = { write: () => new Promise(() => {}), finish: async () => new File([], "x"), abort: async () => {}, release: async () => {}, available: true };
   const bob = new TransferManager({
     createSink: async () => stuck,
     getLink: () => Promise.reject(new Error("n/a")),

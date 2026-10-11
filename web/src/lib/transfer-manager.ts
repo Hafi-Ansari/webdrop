@@ -101,11 +101,14 @@ export class TransferManager {
     for (const t of [...this.outgoing.values(), ...this.incoming.values()]) if (t.peerId === peerId) t.peerName = name;
   }
 
+  /** Forget a finished transfer and free storage held for its files. */
   remove(id: string): void {
     const t = this.outgoing.get(id) ?? this.incoming.get(id);
     if (t && !t.isFinal) return;
     this.outgoing.delete(id);
+    const inc = this.incoming.get(id);
     this.incoming.delete(id);
+    void inc?.release();
     this.opts.onChange();
   }
 

@@ -74,18 +74,25 @@ function TransferRow({ t, onCancel, onDismiss, onSave }: { t: TransferView } & O
           </p>
           {t.direction === "in" && t.state === "done" && t.files.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-2">
-              {t.files.map((f, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => onSave(t.id, i)}
-                  className="inline-flex max-w-full items-center gap-1 rounded-md bg-ink px-2 py-1 text-xs hover:bg-ink-line"
-                  title={t.saved.includes(i) ? "Save again" : "Save"}
-                >
-                  {t.saved.includes(i) ? <RotateCw className="size-3" aria-hidden /> : <Download className="size-3" aria-hidden />}
-                  <span className="truncate">{f.name}</span>
-                </button>
-              ))}
+              {t.files.map((f, i) =>
+                t.savable.includes(i) ? (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => onSave(t.id, i)}
+                    className="inline-flex max-w-full items-center gap-1 rounded-md bg-ink px-2 py-1 text-xs hover:bg-ink-line"
+                    title={t.saved.includes(i) ? "Save again" : "Save"}
+                  >
+                    {t.saved.includes(i) ? <RotateCw className="size-3" aria-hidden /> : <Download className="size-3" aria-hidden />}
+                    <span className="truncate">{f.name}</span>
+                  </button>
+                ) : (
+                  // Evicted to make room for newer files; it is already in Downloads.
+                  <span key={i} className="inline-flex max-w-full items-center px-2 py-1 text-xs text-mist" title="Saved to your downloads; no longer kept here">
+                    <span className="truncate">{f.name}</span>
+                  </span>
+                ),
+              )}
             </div>
           )}
         </div>

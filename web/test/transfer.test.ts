@@ -148,6 +148,21 @@ describe("transfer", () => {
     expect(net.files).toHaveLength(120);
   });
 
+  it("frees received files when a finished transfer is dismissed", async () => {
+    const net = network();
+    const [out] = net.alice.send("bob", "Bob", [randomFile("keep.bin", 100_000)]);
+    await until(() => out!.state === "done");
+    const inc = net.bob.incoming.get(out!.id)!;
+    expect(inc.results[0]).toBeDefined();
+    net.bob.remove(out!.id);
+    await until(() => inc.results.length === 0);
+    expect(net.bob.incoming.has(out!.id)).toBe(false);
+    // Active transfers cannot be dismissed.
+    const [busy] = net.alice.send("bob", "Bob", [randomFile("busy.bin", 4 * 1024 * 1024)]);
+    net.alice.remove(busy!.id);
+    expect(net.alice.outgoing.has(busy!.id)).toBe(true);
+  });
+
   it("gives up when the peer leaves", async () => {
     const net = network({ bytesPerTick: 64 * 1024 });
     const [out] = net.alice.send("bob", "Bob", [randomFile("z.bin", 4 * 1024 * 1024)]);
