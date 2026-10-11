@@ -153,3 +153,7 @@ bench/    benchmarks
 ```
 
 See [STATUS.md](STATUS.md) for what's done and what's left.
+
+## License
+
+[MIT](LICENSE)
