@@ -13,7 +13,7 @@ import type { IceProvider } from "./ice.ts";
 import { hashToken, newPeerId, newResumeToken, newRoomCode } from "./ids.ts";
 import type { Logger } from "./log.ts";
 import { randomName } from "./names.ts";
-import { KeyedLimiter, TokenBucket } from "./rate-limit.ts";
+import { KeyedLimiter, TokenBucket } from "@webdrop/shared/rate-limit";
 
 /** The minimum a socket must offer. Implemented by `ws` and by test fakes. */
 export interface Transport {
@@ -31,6 +31,8 @@ interface PeerState {
   netRoom: Room | null;
   pairRoom: Room | null;
   graceTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Signals relayed *to* this peer, across all senders. */
+  inbound: TokenBucket;
 }
 
 interface Room {
@@ -139,6 +141,7 @@ export class Hub {
         netRoom: null,
         pairRoom: null,
         graceTimer: undefined,
+        inbound: new TokenBucket(this.opts.limits.messageBurst * 2, this.opts.limits.messagesPerSecond * 2, this.opts.now),
       };
       this.peers.set(peer.id, peer);
     }
@@ -252,6 +255,8 @@ export class Hub {
     if (!shares || !target.transport || target.transport.bufferedAmount > this.opts.limits.maxBufferedBytes / 4) {
       return this.sendError(from, "peer-unavailable", msg.to);
     }
+    // Protects a victim from floods spread over many attacker sockets.
+    if (!target.inbound.take()) return this.sendError(from, "rate-limited", msg.to);
     this.send(target, { t: "signal", from: from.id, payload: msg.payload });
   }
 

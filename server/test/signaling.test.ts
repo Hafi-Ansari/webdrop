@@ -201,6 +201,32 @@ describe("origin and admission", () => {
   });
 });
 
+describe("flood protection", () => {
+  it("caps signals delivered to one victim across many attacker sockets", async () => {
+    s = await startServer({ limits: { messageBurst: 5, messagesPerSecond: 0.001, maxViolations: 100 } });
+    const victim = await TestClient.connect(s);
+    const { welcome } = await victim.hello();
+    // Inbound budget is 2x the per-connection burst: 10 signals.
+    const attackers = [];
+    for (let i = 0; i < 3; i++) {
+      const a = await TestClient.connect(s);
+      await a.hello();
+      attackers.push(a);
+    }
+    for (const a of attackers) for (let i = 0; i < 4; i++) a.send({ t: "signal", to: welcome.self.id, payload: { kind: "connect" } });
+    let delivered = 0;
+    try {
+      for (;;) {
+        await victim.next("signal", () => true, 300);
+        delivered++;
+      }
+    } catch {
+      // drained
+    }
+    expect(delivered).toBe(10);
+  });
+});
+
 describe("pair rooms", () => {
   it("lets devices on different networks pair with a code", async () => {
     s = await startServer();

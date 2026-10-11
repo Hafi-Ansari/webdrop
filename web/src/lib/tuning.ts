@@ -4,7 +4,7 @@
  */
 export const tuning = {
   /** Preferred plaintext bytes per frame; capped by the SCTP max message size. */
-  chunkSize: 64 * 1024,
+  chunkSize: 128 * 1024,
   /** Pause sending while the data channel buffers more than this. */
   highWater: 8 * 1024 * 1024,
   /** Resume sending once the buffer drains below this. */
@@ -17,6 +17,8 @@ export const tuning = {
   readBlock: 2 * 1024 * 1024,
   /** Largest plaintext chunk a receiver accepts. */
   maxChunk: 1024 * 1024,
+  /** Transfers at least this large stream to OPFS (when available) instead of memory. */
+  opfsMinBytes: 32 * 1024 * 1024,
 };
 
 /** Frame overhead: 12-byte header + 16-byte GCM tag. */

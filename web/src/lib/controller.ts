@@ -1,4 +1,5 @@
 import type { DeviceInfo, ErrorCode, Peer, RoomTag, ServerMessage, SignalPayload } from "@webdrop/shared/protocol";
+import { TokenBucket } from "@webdrop/shared/rate-limit";
 import { randomId } from "./bytes.ts";
 import { saveFile } from "./download.ts";
 import type { FileMeta } from "./peer-protocol.ts";
@@ -74,6 +75,8 @@ const ERROR_TEXT: Partial<Record<ErrorCode, string>> = {
 };
 
 const LINK_TIMEOUT_MS = 20_000;
+/** Concurrent RTCPeerConnections we are willing to hold. */
+const MAX_SESSIONS = 32;
 
 export class Controller {
   readonly store = new Store<AppState>({
@@ -97,6 +100,8 @@ export class Controller {
   private toastSeq = 0;
   private refreshTimer: ReturnType<typeof setTimeout> | undefined;
   private pendingJoin: string | null = null;
+  /** Remote-initiated session budget per peer: stops a peer from making us build connections in a loop. */
+  private readonly sessionBudget = new Map<string, TokenBucket>();
 
   constructor(opts: { url: string; device: DeviceInfo }) {
     this.signaling = new SignalingClient(opts.url, opts.device);
@@ -114,11 +119,16 @@ export class Controller {
 
   start(): void {
     void cleanupOpfs();
-    const match = /^#pair=([0-9A-Za-z]{6})$/.exec(location.hash);
-    if (match?.[1]) {
-      this.pendingJoin = normalizeCode(match[1]);
+    // Pairing links (QR codes) look like /#pair=CODE. The fragment never reaches the server.
+    const joinFromHash = () => {
+      const match = /^#pair=([0-9A-Za-z]{6})$/.exec(location.hash);
+      if (!match?.[1]) return;
       history.replaceState(null, "", location.pathname + location.search);
-    }
+      const code = normalizeCode(match[1]);
+      if (!this.signaling.send({ t: "room-join", code })) this.pendingJoin = code;
+    };
+    joinFromHash();
+    window.addEventListener("hashchange", joinFromHash);
     this.signaling.start();
   }
 
@@ -250,6 +260,7 @@ export class Controller {
     const now = this.allPeerIds();
     for (const id of before) {
       if (now.has(id)) continue;
+      this.sessionBudget.delete(id);
       this.sessions.get(id)?.close("peer left");
       this.transfers.peerGone(id);
     }
@@ -336,18 +347,27 @@ export class Controller {
     return session.link;
   }
 
+  private allowRemoteSession(peerId: string): boolean {
+    if (this.sessions.size >= MAX_SESSIONS && !this.sessions.has(peerId)) return false;
+    let bucket = this.sessionBudget.get(peerId);
+    if (!bucket) this.sessionBudget.set(peerId, (bucket = new TokenBucket(4, 1 / 5)));
+    return bucket.take();
+  }
+
   private onSignal(from: string, payload: SignalPayload): void {
     if (!this.peer(from) || !this.self) return;
     const current = this.sessions.get(from);
     switch (payload.kind) {
       case "connect":
         // Only the lower id offers. The requester has no usable session, so start fresh.
-        if (this.isOfferer(from)) this.createSession(from, randomId(), true);
+        if (this.isOfferer(from) && this.allowRemoteSession(from)) this.createSession(from, randomId(), true);
         return;
       case "description":
         if (payload.description.type === "offer") {
           if (this.isOfferer(from)) return;
-          const s = current && current.sid === payload.sid && !current.isClosed ? current : this.createSession(from, payload.sid, false);
+          const reuse = current && current.sid === payload.sid && !current.isClosed;
+          if (!reuse && !this.allowRemoteSession(from)) return;
+          const s = reuse ? current : this.createSession(from, payload.sid, false);
           s.handleSignal(payload);
         } else if (current?.sid === payload.sid) {
           current.handleSignal(payload);

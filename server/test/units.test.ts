@@ -12,7 +12,7 @@ import { createIceProvider } from "../src/ice.ts";
 import { newPeerId, newResumeToken, newRoomCode } from "../src/ids.ts";
 import { createLogger } from "../src/log.ts";
 import { nameWords, randomName } from "../src/names.ts";
-import { KeyedLimiter, TokenBucket } from "../src/rate-limit.ts";
+import { KeyedLimiter, TokenBucket } from "@webdrop/shared/rate-limit";
 import { createAppServer } from "../src/server.ts";
 
 const req = (headers: Record<string, string>, remoteAddress = "10.0.0.1") =>

@@ -50,3 +50,17 @@ Each decision has a one-line rationale. Versions were checked against the npm re
 - **Render free web service (Docker runtime) via `render.yaml` blueprint.** It's free with no credit card and supports WebSockets; since Feb 2026, WebSocket messages keep the instance awake.
 - **Dockerfile (node:24-alpine, non-root, multi-stage).** It runs unchanged on Fly.io, Koyeb, DigitalOcean (GitHub Student Pack credits), Azure Container Apps, or a VM.
 - **Vercel is not used.** Vercel functions can't host a long-lived WebSocket server; the same-origin single service is simpler.
+
+## Hardening (milestone 4)
+- **Receiver caps unwritten bytes at 2× the ack window.** A malicious sender that ignores flow control would otherwise grow the receiver's memory without bound.
+- **Per-target inbound signal budget on the server (2× the per-connection limit).** Many attacker sockets each under their own limit could still flood one victim.
+- **Client rate-limits peer-initiated sessions (4 burst, 1 per 5 s per peer) and holds at most 32 connections.** Each `connect`/offer costs the victim an RTCPeerConnection.
+- **The token bucket lives in `shared/`.** Server and client use one implementation.
+- **Pairing links use the URL fragment (`#pair=CODE`) and also react to `hashchange`.** Fragments never reach servers or logs, and scanning a QR code with the app already open still works.
+- **SECURITY.md documents the threat model, including the "codes are optional" caveat.** Honest scope beats an overclaimed "unbreakable E2E".
+
+## Performance (benchmarks in bench/)
+- **Default chunk 128 KiB (capped by SCTP max-message-size).** It was marginally fastest in the 64/128/256 KiB sweep (all within noise at ~25–29 MB/s), with fewer messages and crypto calls than 64 KiB, and it fits Chrome/Safari's 256 KiB limit.
+- **Send-buffer watermarks 8 MiB / 2 MiB.** A sweep of 2/0.5 to 12/4 showed no significant difference; Chrome closes a channel that buffers past 16 MiB, so stay well below it.
+- **One data channel on one connection; no striping.** Measured raw throughput does not scale with parallel RTCPeerConnections (1: 23 MB/s, 2: 23, 4: 20), because Chrome's WebRTC network thread is the bottleneck.
+- **OPFS for transfers ≥ 32 MiB.** Benchmarks show no throughput cost vs memory, and it keeps RAM flat for multi-GB files.

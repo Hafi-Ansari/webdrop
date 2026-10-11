@@ -35,4 +35,9 @@ export default tseslint.config(
     files: ["**/test/**", "bench/**", "e2e/**", "scripts/**"],
     rules: { "no-console": "off", "@typescript-eslint/no-non-null-assertion": "off" },
   },
+  {
+    // Benchmarks and e2e tests poke at window.__webdrop internals.
+    files: ["bench/**", "e2e/**"],
+    rules: { "@typescript-eslint/no-explicit-any": "off" },
+  },
 );

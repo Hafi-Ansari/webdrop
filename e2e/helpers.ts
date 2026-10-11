@@ -10,8 +10,8 @@ export interface Device {
 }
 
 /** Each device gets its own browser context (separate storage = separate identity). */
-export async function openDevice(browser: Browser): Promise<Device> {
-  const context = await browser.newContext({ acceptDownloads: true });
+export async function openDevice(browser: Browser, baseURL?: string): Promise<Device> {
+  const context = await browser.newContext({ acceptDownloads: true, ...(baseURL ? { baseURL } : {}) });
   const page = await context.newPage();
   await page.addInitScript(() => {
     (window as unknown as { __csp: string[] }).__csp = [];

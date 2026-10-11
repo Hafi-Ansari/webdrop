@@ -338,6 +338,8 @@ export class Incoming extends TransferBase {
   private aFile = 0;
   private aChunk = 0;
   private aBytes = 0;
+  /** Bytes received but not yet written; bounded so a sender cannot exhaust our memory. */
+  private queued = 0;
 
   constructor(peerId: string, peerName: string, offer: Extract<SealedMessage, { t: "offer" }>, link: SecureLink, createSink: SinkFactory) {
     const files = offer.files.map((f) => ({ name: sanitizeFileName(f.name), size: f.size, type: sanitizeMime(f.type) }));
@@ -421,6 +423,10 @@ export class Incoming extends TransferBase {
       len <= tuning.maxChunk &&
       (last ? this.aBytes + len === file.size : len > 0 && this.aBytes + len < file.size);
     if (!valid) return this.integrityFailure();
+    // An honest sender never has more than `window` unacknowledged bytes in
+    // flight (acks trail writes by at most `ackEvery`).
+    this.queued += len;
+    if (this.queued > 2 * tuning.window + tuning.maxChunk) return this.integrityFailure("sender ignored flow control");
 
     const index = this.aFile;
     this.aChunk++;
@@ -435,6 +441,9 @@ export class Incoming extends TransferBase {
     plaintext.catch(() => {});
     this.chain = this.chain
       .then(() => this.write(link, index, plaintext, last))
+      .finally(() => {
+        this.queued -= len;
+      })
       .catch((err: unknown) => {
         if (this.isFinal) return;
         this.link?.send({ t: "cancel", id: this.id, reason: "error" }).catch(() => {});
@@ -480,10 +489,10 @@ export class Incoming extends TransferBase {
     }
   }
 
-  private integrityFailure(): void {
+  private integrityFailure(why = "integrity check failed"): void {
     if (this.isFinal) return;
     this.link?.send({ t: "cancel", id: this.id, reason: "integrity" }).catch(() => {});
-    this.stop("failed", "integrity check failed");
+    this.stop("failed", why);
   }
 
   private stop(state: "cancelled" | "failed", error?: string): void {

@@ -1,3 +1,5 @@
+import { tuning } from "./tuning.ts";
+
 /**
  * Where received bytes go. Large transfers stream into the Origin Private
  * File System so multi-GB files never sit in RAM; small ones (or browsers
@@ -119,7 +121,7 @@ export async function cleanupOpfs(maxAgeMs = 6 * 3600_000): Promise<void> {
 
 /** Use OPFS for large transfers when there is room for them. */
 export async function createSink(name: string, transferTotal: number): Promise<Sink> {
-  if (transferTotal >= 32 * 1024 * 1024 && opfsSupported()) {
+  if (transferTotal >= tuning.opfsMinBytes && opfsSupported()) {
     try {
       const { quota = 0, usage = 0 } = await navigator.storage.estimate();
       if (quota - usage > transferTotal * 1.1) return await OpfsSink.create(name);
