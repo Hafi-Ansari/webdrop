@@ -67,7 +67,8 @@ Each decision has a one-line rationale. Versions were checked against the npm re
 - **A `connect` request never replaces a session that is still being set up.** The pending offer reaches the requester anyway; replacing it caused pointless churn.
 
 ## Performance (benchmarks in bench/)
-- **Default chunk 128 KiB (capped by SCTP max-message-size).** It was marginally fastest in the 64/128/256 KiB sweep (all within noise at ~25–29 MB/s), with fewer messages and crypto calls than 64 KiB, and it fits Chrome/Safari's 256 KiB limit.
+- **Default chunk 256 KiB, capped by the peer's SCTP max-message-size (minus 28 bytes of framing).** With one browser process per device it was consistently, if narrowly, fastest (80–81 MB/s vs 71–78 for 128/192 KiB). It needs the fewest messages and crypto calls, and it caps itself on Chrome/Safari's 256 KiB limit.
+- **Benchmark with persistent profiles, one browser process per device.** Private contexts share one process and network thread and have a tiny storage quota, which understated throughput (~25–30 MB/s) and masked the chunk-size effect.
 - **Send-buffer watermarks 8 MiB / 2 MiB.** A sweep of 2/0.5 to 12/4 showed no significant difference; Chrome closes a channel that buffers past 16 MiB, so stay well below it.
-- **One data channel on one connection; no striping.** Measured raw throughput does not scale with parallel RTCPeerConnections (1: 23 MB/s, 2: 23, 4: 20), because Chrome's WebRTC network thread is the bottleneck.
+- **One data channel on one connection; no striping.** Measured raw throughput does not scale with parallel RTCPeerConnections inside one process (1: 23 MB/s, 2: 23, 4: 20). The per-process WebRTC network thread is the limit, and the encrypted pipeline already matches the raw channel.
 - **OPFS for transfers ≥ 32 MiB.** Benchmarks show no throughput cost vs memory, and it keeps RAM flat for multi-GB files.

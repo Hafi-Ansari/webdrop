@@ -6,8 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  */
 class FakeFileHandle {
   data: Uint8Array[] = [];
-  committed = 0;
-  constructor(readonly fs: FakeFs) {}
+  readonly fs: FakeFs;
+  constructor(fs: FakeFs) {
+    this.fs = fs;
+  }
   async createWritable() {
     const pending: Uint8Array[] = [];
     return {
@@ -35,7 +37,10 @@ class FakeFileHandle {
 class FakeFs {
   files = new Map<string, FakeFileHandle>();
   inflight = 0;
-  constructor(readonly quota: number) {}
+  readonly quota: number;
+  constructor(quota: number) {
+    this.quota = quota;
+  }
   usage() {
     let n = this.inflight;
     for (const f of this.files.values()) n += f.data.reduce((m, c) => m + c.byteLength, 0);

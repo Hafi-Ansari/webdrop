@@ -1,11 +1,14 @@
 /**
  * Baseline: raw RTCDataChannel throughput with no encryption or protocol,
- * using the same backpressure scheme, between two separate browser contexts
+ * using the same backpressure scheme, between two separate browser processes
  * (like two devices). Shows how close the real pipeline gets to what the
  * browser itself can do.
  *
  *   node bench/raw.ts --size 256 --chunks 16,64,256
  */
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { chromium, type Page } from "@playwright/test";
 
 const args = new Map<string, string>();
@@ -13,10 +16,14 @@ for (let i = 2; i < process.argv.length; i += 2) args.set(process.argv[i]!.repla
 const sizeMb = Number(args.get("size") ?? 256);
 const chunks = (args.get("chunks") ?? "16,64,256").split(",").map(Number);
 
-const browser = await chromium.launch({ args: ["--disable-features=WebRtcHideLocalIpsWithMdns"] });
+const dirs: string[] = [];
 
+/** One persistent profile per side, each in its own browser process (like two devices). */
 async function side(): Promise<Page> {
-  const page = await (await browser.newContext()).newPage();
+  const dir = mkdtempSync(path.join(tmpdir(), "webdrop-raw-"));
+  dirs.push(dir);
+  const ctx = await chromium.launchPersistentContext(dir, { args: ["--disable-features=WebRtcHideLocalIpsWithMdns"] });
+  const page = ctx.pages()[0] ?? (await ctx.newPage());
   await page.goto("about:blank");
   await page.evaluate(() => {
     const w = window as any;
@@ -81,4 +88,4 @@ for (const kb of chunks) {
   await tx.context().close();
   await rx.context().close();
 }
-await browser.close();
+for (const dir of dirs) rmSync(dir, { recursive: true, force: true });

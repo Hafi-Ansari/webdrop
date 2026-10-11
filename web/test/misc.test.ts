@@ -33,7 +33,8 @@ describe("pairing codes", () => {
 
 describe("chunk sizing", () => {
   it("respects the remote SCTP max message size", () => {
-    expect(chunkSizeFor(262144)).toBe(tuning.chunkSize);
+    // Chrome/Safari advertise 256 KiB: the frame (header + tag) must fit inside it.
+    expect(chunkSizeFor(262144)).toBe(Math.min(tuning.chunkSize, 262144 - 28));
     expect(chunkSizeFor(65536)).toBe(65536 - 28);
     expect(chunkSizeFor(1 << 30)).toBe(tuning.chunkSize);
     expect(chunkSizeFor(undefined)).toBe(16 * 1024 - 28);

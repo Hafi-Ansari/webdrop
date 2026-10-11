@@ -4,7 +4,7 @@
  */
 export const tuning = {
   /** Preferred plaintext bytes per frame; capped by the SCTP max message size. */
-  chunkSize: 128 * 1024,
+  chunkSize: 256 * 1024,
   /** Pause sending while the data channel buffers more than this. */
   highWater: 8 * 1024 * 1024,
   /** Resume sending once the buffer drains below this. */
