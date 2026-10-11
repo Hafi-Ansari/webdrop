@@ -1,0 +1,25 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# New > Blueprint > pick this repo. One free web service serves the app and signaling.
+services:
+  - type: web
+    name: webdrop
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit
+    envVars:
+      # Render's edge (Cloudflare) sets this to the real client IP; used to group
+      # devices by network. Check the "client ip source" log line after deploy.
+      - key: CLIENT_IP_HEADER
+        value: cf-connecting-ip
+      - key: LOG_LEVEL
+        value: info
+      # Optional TURN relay for devices behind strict NATs (Cloudflare Realtime,
+      # 1,000 GB/month free). Leave empty to use STUN only.
+      - key: CF_TURN_KEY_ID
+        sync: false
+      - key: CF_TURN_API_TOKEN
+        sync: false

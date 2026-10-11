@@ -3,7 +3,7 @@ import type { AddressInfo } from "node:net";
 import type { Duplex } from "node:stream";
 import { CloseCode, LIMITS } from "@webdrop/shared/protocol";
 import { WebSocketServer, type WebSocket } from "ws";
-import { clientIp, createNetworkKeyer } from "./client-ip.ts";
+import { createNetworkKeyer, resolveClientIp, type IpSource } from "./client-ip.ts";
 import type { Config } from "./config.ts";
 import { Hub, type Transport } from "./hub.ts";
 import { createIceProvider, type IceProvider } from "./ice.ts";
@@ -66,6 +66,7 @@ export function createAppServer(config: Config, deps: { log?: Logger; iceProvide
     perMessageDeflate: false,
   });
   const alive = new WeakMap<WebSocket, boolean>();
+  const loggedSources = new Set<IpSource>();
 
   const reject = (socket: Duplex, status: number) => {
     socket.end(`HTTP/1.1 ${status} ${http.STATUS_CODES[status]}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
@@ -78,7 +79,12 @@ export function createAppServer(config: Config, deps: { log?: Logger; iceProvide
       log.debug("ws origin rejected", { origin: req.headers.origin });
       return reject(socket, 403);
     }
-    const ip = clientIp(req, config);
+    const { ip, source } = resolveClientIp(req, config);
+    if (!loggedSources.has(source)) {
+      // Lets operators confirm proxy settings from the logs (never logs the IP itself).
+      loggedSources.add(source);
+      log.info("client ip source", { source, header: config.clientIpHeader ?? null, trustProxyHops: config.trustProxyHops });
+    }
     const admission = hub.admit(ip);
     if (!admission.ok) {
       log.debug("ws rejected", { reason: admission.reason });

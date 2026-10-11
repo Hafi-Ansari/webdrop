@@ -14,25 +14,33 @@ function normalize(raw: string | undefined): string | undefined {
   return isIP(ip) ? ip.toLowerCase() : undefined;
 }
 
+export type IpSource = "header" | "xff" | "socket";
+
 /**
  * Resolve the client's IP. Order: trusted edge header, then X-Forwarded-For
  * counted from the right by the number of trusted hops, then the socket.
  * Client-supplied values are only honoured when the operator opted in.
  */
-export function clientIp(req: IncomingMessage, config: Pick<Config, "clientIpHeader" | "trustProxyHops">): string {
+export function resolveClientIp(
+  req: IncomingMessage,
+  config: Pick<Config, "clientIpHeader" | "trustProxyHops">,
+): { ip: string; source: IpSource } {
   if (config.clientIpHeader) {
     const value = req.headers[config.clientIpHeader];
     const ip = normalize(Array.isArray(value) ? value[0] : value);
-    if (ip) return ip;
+    if (ip) return { ip, source: "header" };
   }
   if (config.trustProxyHops > 0) {
     const xff = req.headers["x-forwarded-for"];
     const parts = (Array.isArray(xff) ? xff.join(",") : (xff ?? "")).split(",").map((s) => s.trim()).filter(Boolean);
     const ip = normalize(parts[parts.length - config.trustProxyHops]);
-    if (ip) return ip;
+    if (ip) return { ip, source: "xff" };
   }
-  return normalize(req.socket.remoteAddress) ?? "unknown";
+  return { ip: normalize(req.socket.remoteAddress) ?? "unknown", source: "socket" };
 }
+
+export const clientIp = (req: IncomingMessage, config: Pick<Config, "clientIpHeader" | "trustProxyHops">): string =>
+  resolveClientIp(req, config).ip;
 
 /** Expand an IPv6 address into 8 hextets. Assumes `isIP(ip) === 6`. */
 function expandV6(ip: string): string[] {
