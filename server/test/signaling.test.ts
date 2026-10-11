@@ -350,4 +350,64 @@ describe("resume", () => {
     await a.expectNone("peer-left", 50);
     expect((await a.next("peer-left")).id).toBe(wb.self.id);
   });
+
+  it("drops a peer that leaves its page at once, and a reload resumes it", async () => {
+    s = await startServer({ limits: { resumeGraceMs: 5000 } });
+    const a = await TestClient.connect(s);
+    await a.hello();
+    const b = await TestClient.connect(s);
+    const { welcome: wb } = await b.hello();
+    await a.next("peer-joined");
+
+    b.ws.close(CloseCode.leaving);
+    expect((await a.next("peer-left", () => true, 500)).id).toBe(wb.self.id);
+
+    const b2 = await TestClient.connect(s);
+    const { welcome: wb2, peers } = await b2.hello(wb.resume);
+    expect(wb2.resumed).toBe(true);
+    expect(wb2.self).toEqual(wb.self);
+    expect(peers.peers).toHaveLength(1);
+    expect((await a.next("peer-joined")).peer).toEqual(wb.self);
+  });
+
+  it("rejoins a vacated pair room on resume", async () => {
+    s = await startServer({ limits: { resumeGraceMs: 5000 } });
+    const a = await TestClient.connect(s, { ip: "203.0.113.5" });
+    const { welcome: wa } = await a.hello();
+    a.send({ t: "room-create" });
+    const { room } = await a.next("peers", (m) => m.room.startsWith("pair:"));
+    const b = await TestClient.connect(s, { ip: "198.51.100.7" });
+    const { welcome: wb } = await b.hello();
+    b.send({ t: "room-join", code: room.slice(5) });
+    await b.next("peers", (m) => m.room === room);
+    await a.next("peer-joined");
+
+    a.ws.close(CloseCode.leaving);
+    expect(await b.next("peer-left")).toEqual({ t: "peer-left", room, id: wa.self.id });
+
+    const a2 = await TestClient.connect(s, { ip: "203.0.113.5" });
+    await a2.hello(wa.resume);
+    expect((await a2.next("peers", (m) => m.room === room)).peers).toEqual([wb.self]);
+    expect(await b.next("peer-joined")).toEqual({ t: "peer-joined", room, peer: wa.self });
+  });
+
+  it("restores a pair room that emptied while its only member was away", async () => {
+    s = await startServer({ limits: { resumeGraceMs: 5000 } });
+    const a = await TestClient.connect(s, { ip: "203.0.113.5" });
+    const { welcome: wa } = await a.hello();
+    a.send({ t: "room-create" });
+    const { room } = await a.next("peers", (m) => m.room.startsWith("pair:"));
+
+    a.ws.close(CloseCode.leaving);
+    await a.closed;
+    await sleep(50);
+    const a2 = await TestClient.connect(s, { ip: "203.0.113.5" });
+    await a2.hello(wa.resume);
+    await a2.next("peers", (m) => m.room === room);
+
+    const c = await TestClient.connect(s, { ip: "198.51.100.7" });
+    await c.hello();
+    c.send({ t: "room-join", code: room.slice(5) });
+    expect((await c.next("peers", (m) => m.room === room)).peers).toEqual([wa.self]);
+  });
 });

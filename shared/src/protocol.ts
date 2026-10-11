@@ -144,6 +144,8 @@ export const CloseCode = {
   rateLimited: 4002,
   replaced: 4003,
   slowConsumer: 4004,
+  /** Sent by the client when its page goes away (close, reload, navigation). */
+  leaving: 4005,
 } as const;
 
 export function parseJson(raw: string): unknown {

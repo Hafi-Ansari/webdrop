@@ -1,4 +1,4 @@
-import { PROTOCOL_VERSION, ServerMessage, parseJson, type ClientMessage, type DeviceInfo } from "@webdrop/shared/protocol";
+import { CloseCode, PROTOCOL_VERSION, ServerMessage, parseJson, type ClientMessage, type DeviceInfo } from "@webdrop/shared/protocol";
 
 export type SignalingState = "connecting" | "open" | "offline";
 
@@ -15,6 +15,8 @@ function storage(): Storage | null {
 /**
  * Reconnecting signaling socket. Keeps the server-issued resume token in
  * sessionStorage (per tab) so a reload or network blip keeps our identity.
+ * Leaving the page closes the socket with `CloseCode.leaving`, so other
+ * devices drop us at once instead of after the server's resume grace period.
  */
 export class SignalingClient {
   state: SignalingState = "connecting";
@@ -40,6 +42,13 @@ export class SignalingClient {
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible" && !this.ws) this.reconnectNow();
     });
+    window.addEventListener("pagehide", () => this.stop());
+    // Restored from the back/forward cache: come back (resuming our identity if still in grace).
+    window.addEventListener("pageshow", (e) => {
+      if (!e.persisted) return;
+      this.stopped = false;
+      this.reconnectNow();
+    });
   }
 
   send(msg: ClientMessage): boolean {
@@ -55,10 +64,11 @@ export class SignalingClient {
     this.connect();
   }
 
+  /** Disconnect for good: the server removes us from our rooms right away. */
   stop(): void {
     this.stopped = true;
     clearTimeout(this.reconnectTimer);
-    this.ws?.close(1000);
+    this.ws?.close(CloseCode.leaving, "leaving");
   }
 
   private setState(state: SignalingState): void {

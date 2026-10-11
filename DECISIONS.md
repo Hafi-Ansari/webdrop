@@ -27,6 +27,7 @@ Each decision has a one-line rationale. Versions were checked against the npm re
 - **The server assigns names and IDs; clients cannot choose them.** No free-text from peers reaches other users, which prevents impersonation and injection.
 - **Peer IDs are 128-bit random (base64url).** They're unguessable, so targeted signal injection without sharing a room is impossible.
 - **Resume token (256-bit, hashed server-side) with a 15 s grace period.** A brief network blip keeps the same ID and name, so in-flight transfers can resume.
+- **Leaving the page (`pagehide`) closes the socket with code 4005; the server then drops the peer from its rooms at once but keeps the identity for the grace period.** Other devices no longer show a "ghost" for 15 s, and a reload still comes back with the same name and pair room. Only this explicit code counts as leaving: a plain or proxy-initiated close stays a blip, so live transfers survive it.
 - **Rooms: automatic "network" room keyed by public IPv4 or IPv6 /64, HMAC'd with a per-boot random key.** This matches the "same network" behaviour, and raw IPs are never exposed to clients.
 - **Optional pairing rooms with 6-char server-generated Crockford-base32 codes (30 bits), rate-limited joins.** Devices on different networks can still pair, and brute force is impractical at 10 attempts/min/IP.
 - **Delta broadcasts (`peer-joined`/`peer-left`) scoped per room.** That's O(room) fan-out instead of O(all users) on every change.

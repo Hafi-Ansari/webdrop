@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { makeFile, openDevice, sendTo, sha256 } from "./helpers.ts";
+import { makeFile, openDevice, peerCard, sendTo, sha256 } from "./helpers.ts";
 
 test("a transfer resumes where it left off after the connection drops", async ({ browser }, info) => {
   const alice = await openDevice(browser);
@@ -72,6 +72,26 @@ test("a signaling reconnect does not disturb a running transfer", async ({ brows
     await expect(alice.page.getByTestId("transfer")).toHaveAttribute("data-state", "done");
     // Same names after the reconnect: identities were resumed, not replaced.
     await expect(alice.page.getByTestId("self-name")).toHaveText(alice.name);
+  } finally {
+    await alice.close();
+    await bob.close();
+  }
+});
+
+test("a reload keeps the same identity and a device that leaves disappears at once", async ({ browser }) => {
+  const alice = await openDevice(browser);
+  const bob = await openDevice(browser);
+  try {
+    await expect(peerCard(alice.page, bob.name)).toBeVisible();
+
+    await bob.page.reload();
+    await expect(bob.page.getByTestId("connection")).toHaveAttribute("data-state", "open");
+    await expect(bob.page.getByTestId("self-name")).toHaveText(bob.name);
+    await expect(peerCard(alice.page, bob.name)).toHaveCount(1);
+
+    // Well under the server's 15 s resume grace period.
+    await bob.page.goto("about:blank");
+    await expect(peerCard(alice.page, bob.name)).toHaveCount(0, { timeout: 5000 });
   } finally {
     await alice.close();
     await bob.close();

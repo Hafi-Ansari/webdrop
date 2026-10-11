@@ -157,15 +157,35 @@ export class Hub {
     const netKey = "net:" + this.opts.networkKey(ip);
     if (peer.netRoom && peer.netRoom.key !== netKey) this.leaveRoom(peer, peer.netRoom, false);
     if (!this.joinRoom(peer, this.room(netKey, "net"))) this.sendError(peer, "room-full", "net");
-    if (peer.pairRoom) this.joinRoom(peer, peer.pairRoom);
+    const pair = peer.pairRoom;
+    if (pair) {
+      // A peer that left the page vacated its pair room, which may have emptied
+      // (and been unregistered) since. Rejoin unless its code now names another room.
+      const live = this.rooms.get(pair.key);
+      if (!live) this.rooms.set(pair.key, pair);
+      if ((live && live !== pair) || !this.joinRoom(peer, pair)) peer.pairRoom = null;
+    }
   }
 
-  /** @internal Socket closed: keep the identity for the grace period so the client can resume. */
-  detachPeer(peer: PeerState, transport: Transport): void {
+  /**
+   * @internal Socket closed: keep the identity for the grace period so the
+   * client can resume. A client leaving its page also leaves its rooms now
+   * instead of lingering in other devices' lists until the grace period ends.
+   */
+  detachPeer(peer: PeerState, transport: Transport, leaving: boolean): void {
     if (peer.transport !== transport) return;
     peer.transport = null;
+    if (leaving) this.vacate(peer);
     peer.graceTimer = setTimeout(() => this.removePeer(peer), this.opts.limits.resumeGraceMs);
     peer.graceTimer.unref?.();
+  }
+
+  /** Leave every room, remembering the pair room so a resume (e.g. a reload) can rejoin it. */
+  private vacate(peer: PeerState): void {
+    const pair = peer.pairRoom;
+    if (peer.netRoom) this.leaveRoom(peer, peer.netRoom, false);
+    if (pair) this.leaveRoom(peer, pair, false);
+    peer.pairRoom = pair;
   }
 
   private removePeer(peer: PeerState): void {
@@ -208,7 +228,8 @@ export class Hub {
       const msg: ServerMessage = { t: "peer-left", room: room.tag, id: peer.id };
       for (const other of room.members) this.send(other, msg);
     }
-    if (room.members.size === 0) this.rooms.delete(room.key);
+    // A vacated room may already be unregistered, and its code reused by another.
+    if (room.members.size === 0 && this.rooms.get(room.key) === room) this.rooms.delete(room.key);
     if (peer.netRoom === room) peer.netRoom = null;
     if (peer.pairRoom === room) peer.pairRoom = null;
     if (notifySelf) this.send(peer, { t: "room-left", room: room.tag });
@@ -351,12 +372,13 @@ export class Connection {
     }
   }
 
-  onClose(): void {
+  /** `code` is the close code the client sent, if any. */
+  onClose(code?: number): void {
     if (this.closed) return;
     this.closed = true;
     clearTimeout(this.helloTimer);
     this.hub.released(this.ip);
-    if (this.peer) this.hub.detachPeer(this.peer, this.transport);
+    if (this.peer) this.hub.detachPeer(this.peer, this.transport, code === CloseCode.leaving);
   }
 
   private async hello(msg: Extract<ClientMessage, { t: "hello" }>): Promise<void> {
